@@ -14,8 +14,13 @@ def scrape_racecard(url):
     response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
     soup = BeautifulSoup(response.text, "html.parser")
 
+    # Debug: Save raw HTML for inspection
+    with open("/tmp/raw_racecard.html", "w", encoding="utf-8") as f:
+        f.write(soup.prettify())
+
     runners = []
     rows = soup.select(".RC-runnerRow")
+    st.write(f"🔍 Found {len(rows)} runner rows on the page.")
     for row in rows:
         try:
             horse_name = row.select_one(".RC-runnerName").text.strip()
@@ -31,7 +36,8 @@ def scrape_racecard(url):
                 "Jockey": jockey_name,
                 "Form": form
             })
-        except:
+        except Exception as e:
+            st.error(f"Runner parse error: {e}")
             continue
 
     return runners
@@ -41,12 +47,13 @@ if go and race_url:
     try:
         runner_data = scrape_racecard(race_url)
         if not runner_data:
-            st.error("No runners found. Try a different URL.")
+            st.error("❌ No runners found. Try a different URL.")
+            st.download_button("⬇️ Download Raw HTML", data=open("/tmp/raw_racecard.html", "r", encoding="utf-8").read(), file_name="raw_racecard.html")
         else:
             df = pd.DataFrame(runner_data)
             df["Form Score"] = df["Form"].apply(lambda x: sum([int(ch) for ch in x if ch.isdigit()]) if x != "N/A" else 0)
             df = df.sort_values(by="Form Score")
-            st.success("Race loaded!")
+            st.success("✅ Race loaded successfully!")
             st.dataframe(df.reset_index(drop=True))
     except Exception as e:
         st.exception(e)
